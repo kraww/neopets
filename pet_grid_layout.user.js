@@ -3,7 +3,7 @@
 // @namespace    http://tampermonkey.net/
 // @version      1.1
 // @description  Replaces the horizontal pet carousel on the home page with a grid
-// @author       you
+// @author       Krawwly
 // @match        https://www.neopets.com/home/index.phtml*
 // @match        https://www.neopets.com/home/
 // @grant        none

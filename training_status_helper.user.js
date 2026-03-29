@@ -3,7 +3,7 @@
 // @namespace    http://tampermonkey.net/
 // @version      1.0
 // @description  Collapse/expand pets and pin your main pet to the top on the training status page
-// @author       you
+// @author       Krawwly
 // @match        https://www.neopets.com/island/training.phtml*
 // @match        https://www.neopets.com/pirates/academy.phtml*
 // @grant        none
