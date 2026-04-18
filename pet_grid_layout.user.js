@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Neopets - Pet Grid Layout
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.3
 // @description  Replaces the horizontal pet carousel on the home page with a grid
 // @author       Krawwly
 // @match        https://www.neopets.com/home/index.phtml*
@@ -12,73 +12,96 @@
 (function () {
     'use strict';
 
-    const css = `
-        /* Hide prev/next arrows */
-        .hp-carousel-container .slick-arrow {
-            display: none !important;
+    const style = document.createElement('style');
+    style.textContent = `
+        #krawwly-pet-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 10px;
+            padding: 10px 0;
+            width: 100%;
         }
-
-        /* Remove the overflow clip on the slider viewport */
-        .hp-carousel-container .slick-list {
-            overflow: visible !important;
+        .krawwly-pet-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            cursor: pointer;
         }
-
-        /* Replace the sliding track with a grid */
-        .hp-carousel-container .slick-track {
-            display: grid !important;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important;
-            gap: 8px !important;
-            transform: none !important;
-            width: 100% !important;
-            float: none !important;
+        .krawwly-pet-img {
+            width: 140px;
+            height: 140px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center bottom;
         }
-
-        /* Make all real slides visible and block-level */
-        .hp-carousel-container .slick-slide {
-            display: block !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            float: none !important;
-            width: auto !important;
-            height: auto !important;
-        }
-
-        /* Hide cloned slides — must come AFTER .slick-slide rule to win specificity */
-        .hp-carousel-container .slick-slide.slick-cloned,
-        .hp-carousel-container .slick-slide[data-slick-index^="-"] {
-            display: none !important;
-        }
-
-        /* Make the inner pet container fill its grid cell */
-        .hp-carousel-pet-container {
-            width: 100% !important;
-        }
-
-        /* Shrink the oversized name buttons */
-        .hp-carousel-nameplate {
-            padding: 4px 10px !important;
-            margin-top: 6px !important;
+        /* Shrink the cloned nameplate to match the pet cell size */
+        .krawwly-pet-cell .hp-carousel-nameplate {
+            margin-top: 5px;
+            padding: 3px 10px !important;
             font-size: 14px !important;
+            width: auto !important;
+            max-width: 120px !important;
+            min-width: unset !important;
         }
     `;
-
-    const style = document.createElement('style');
-    style.textContent = css;
     document.head.appendChild(style);
 
-    // Slick also sets aria-hidden="true" on non-visible slides which can affect
-    // rendering in some browsers — remove those attributes after the slider initializes.
-    function unhideSlides() {
-        const hidden = document.querySelectorAll('.hp-carousel-container .slick-slide[aria-hidden="true"]:not(.slick-cloned)');
-        if (hidden.length === 0) return false;
-        hidden.forEach(el => el.removeAttribute('aria-hidden'));
+    function buildGrid() {
+        // Grab all real (non-cloned) pet containers from Slick
+        const containers = Array.from(
+            document.querySelectorAll('.hp-carousel-container .slick-slide:not(.slick-cloned) .hp-carousel-pet-container')
+        );
+        if (containers.length === 0) return false;
+
+        // Find where to insert — right after the carousel container
+        const carousel = document.querySelector('.hp-carousel-container');
+        if (!carousel) return false;
+
+        // Don't build twice
+        if (document.getElementById('krawwly-pet-grid')) return true;
+
+        const grid = document.createElement('div');
+        grid.id = 'krawwly-pet-grid';
+
+        containers.forEach(container => {
+            const petDiv      = container.querySelector('.hp-carousel-pet');
+            const nameplateEl = container.querySelector('.hp-carousel-nameplate');
+            if (!petDiv) return;
+
+            const bgImage = petDiv.style.backgroundImage;
+            const onclick = petDiv.getAttribute('onclick') || '';
+
+            const cell = document.createElement('div');
+            cell.className = 'krawwly-pet-cell';
+            if (onclick) cell.setAttribute('onclick', onclick);
+
+            // Copy all data-* attributes so any Neopets JS that reads them still works
+            Array.from(petDiv.attributes).forEach(attr => {
+                if (attr.name.startsWith('data-')) cell.setAttribute(attr.name, attr.value);
+            });
+
+            const img = document.createElement('div');
+            img.className = 'krawwly-pet-img';
+            img.style.backgroundImage = bgImage;
+
+            cell.appendChild(img);
+
+            // Clone the original nameplate so it keeps all Neopets styling
+            if (nameplateEl) cell.appendChild(nameplateEl.cloneNode(true));
+
+            grid.appendChild(cell);
+        });
+
+        // Hide the original carousel, insert our grid in its place
+        carousel.style.display = 'none';
+        carousel.parentNode.insertBefore(grid, carousel.nextSibling);
         return true;
     }
 
-    // Slick initializes after page load, so poll briefly
     let attempts = 0;
     const interval = setInterval(() => {
-        if (unhideSlides() || ++attempts > 20) clearInterval(interval);
+        if (buildGrid() || ++attempts > 20) clearInterval(interval);
     }, 300);
 
 })();
